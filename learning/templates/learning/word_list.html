@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>背单词</title>
+</head>
+<body>
+    <h1>背单词</h1>
+    <ul>
+        {% for word in words %}
+            <li>
+                <strong>{{ word.word }}</strong>: {{ word.definition }}<br>
+                <em>{{ word.example }}</em>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
