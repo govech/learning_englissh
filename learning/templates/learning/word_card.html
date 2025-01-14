@@ -2,9 +2,73 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>单词卡片</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        .word {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .pronunciation {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        .definition {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        .chinese-meaning {
+            font-size: 1.2em;
+            color: #007BFF;
+            margin-bottom: 20px;
+        }
+        .example {
+            font-size: 1em;
+            color: #777;
+            font-style: italic;
+        }
+        .refresh-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .refresh-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-
+    <div class="card">
+        <div class="word">{{ word.word }}</div>
+        <div class="pronunciation">美式音标: {{ word.phonetic }}</div>
+        <div class="definition">{{ word.definition }}</div>
+        <button class="refresh-button" onclick="window.location.reload()">下一个单词</button>
+    </div>
 </body>
 </html>

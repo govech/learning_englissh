@@ -16,13 +16,14 @@ class Word(models.Model):
     - definition: 单词的定义或解释，最大长度为100字符。
     - example: 使用该单词的例句或示例，长度不受限制。
     """
-
     word = models.CharField(max_length=100)
     definition = models.CharField(max_length=100)
     example = models.TextField()
-    phonetic_uk = models.CharField(max_length=100, blank=True)  # 英音音标
-    phonetic_us = models.CharField(max_length=100, blank=True)  # 美音音标
+    phonetic_uk = models.CharField(max_length=100, blank=True)  # 英音发音地址
+    phonetic = models.CharField(max_length=100, blank=True)
+    phonetic_us = models.CharField(max_length=100, blank=True)  # 美音发音地址
     rating = models.IntegerField(default=0, choices=[(i, str(i)) for i in range(0, 6)])  # 熟练度等级限制在0~5
+
 
     def __str__(self):
         """

@@ -1,10 +1,16 @@
+import logging
+
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Word
-
+import requests
+from lxml import html
 
 # Create your views here.
+
+# 设置日志配置
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def home(request):
@@ -21,8 +27,6 @@ def register(request):
     else:
         form = UserCreationForm()
     return render(request, 'learning/register.html', {'form': form})
-
-
 
 
 def word_list(request):
@@ -46,15 +50,89 @@ def word_list(request):
 
 def word_card(request):
     # 这里实现单词卡片的功能
-    return render(request, 'learning/word_card.html')
+    random_word = Word.objects.order_by('?').first()
+
+    # 如果单词没有中文意思，调用翻译 API 获取并保存
+    if not random_word.definition:
+        phonetic,chinese_meaning, uk_pronunciation_link, us_pronunciation_link = get_youdao_data(random_word)
+        if chinese_meaning:
+            random_word.definition = chinese_meaning
+            random_word.phonetic = phonetic
+            random_word.save()  # 保存到数据库
+
+
+
+    # if uk_pronunciation_link:
+    #     download_audio(uk_pronunciation_link, f"{random_word}_uk.mp3")
+    # if us_pronunciation_link:
+    #     download_audio(us_pronunciation_link, f"{random_word}_us.mp3")
+
+    # print(f"Word: {random_word}, Phonetic: {phonetic}")
+    # print(f"translation: {trans_text}")
+    # print(f"UK Pronunciation Link: {uk_pronunciation_link}")
+    # print(f"US Pronunciation Link: {us_pronunciation_link}")
+
+    return render(request, 'learning/word_card.html', {'word': random_word})
+
+
+def download_audio(url, filename):
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            with open(filename, 'wb') as f:
+                f.write(response.content)
+            logging.info(f"音频文件已保存为 {filename}")
+        else:
+            logging.error(f"下载失败，状态码：{response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"下载音频时发生异常: {e}")
+
+
+def get_youdao_data(word):
+    if not word:
+        logging.warning("输入的单词为空")
+        return "", "", ""
+
+    try:
+
+        url = f"https://www.youdao.com/result?word={word}&lang=en"
+
+        # 添加请求头伪装
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+
+        # 检查请求是否成功
+        if response.status_code == 200:
+            tree = html.fromstring(response.content)
+
+            # 使用XPath提取音标
+            phonetic = tree.xpath('//span[@class="phonetic"]/text()')
+            phonetic = phonetic[0].strip() if phonetic else ""
+
+            # 获取翻译
+            # 提取第一个 li 元素下的 span 文字
+            trans_spans = tree.xpath('//ul[@class="basic"]/li[1]/span')
+            trans_text = ' '.join(span.text.strip() for span in trans_spans if span.text)
+
+            # 英式发音
+            uk_pronunciation_link = f'https://dict.youdao.com/dictvoice?audio={word}&type=1'
+            # 美式发音
+            us_pronunciation_link = f'https://dict.youdao.com/dictvoice?audio={word}&type=2'
+
+            return phonetic, trans_text, uk_pronunciation_link, us_pronunciation_link
+        else:
+            logging.error(f"请求失败，状态码：{response.status_code}")
+            return "", "", "",""
+    except requests.exceptions.RequestException as e:
+        logging.error(f"网络请求异常: {e}")
+        return "", "", "",""
 
 
 def reading_page(request):
     # 这里实现阅读页的功能
     return render(request, 'learning/reading_page.html')
-
-
-
 
 
 def add_words(request):
@@ -75,4 +153,3 @@ def delete_word(request, word_id):
     word = get_object_or_404(Word, id=word_id)
     word.delete()
     return redirect('word_list')  # 重定向到单词列表页面
-
