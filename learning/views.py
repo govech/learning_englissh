@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from .models import Word
 
 
@@ -36,3 +36,20 @@ def word_card(request):
 def reading_page(request):
     # 这里实现阅读页的功能
     return render(request, 'learning/reading_page.html')
+
+
+
+
+
+def add_words(request):
+    if request.method == "POST":
+        words_text = request.POST.get('words', '')  # 获取文本区域中的数据
+        if words_text:
+            lines = words_text.strip().split('\n')  # 按行分割文本
+            for line in lines:
+                word = line.strip()  # 去除多余空格
+                if word:  # 如果行不为空
+                    # 添加到数据库（假设没有音标和释义时）
+                    Word.objects.get_or_create(word=word)
+            return redirect('word_list')  # 保存成功后重定向到单词列表页
+    return render(request, 'learning/add_words.html')
