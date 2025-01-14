@@ -1,4 +1,5 @@
 <!-- templates/learning/home.html -->
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,6 +18,24 @@
             color: white;
             padding: 20px;
             text-align: center;
+            position: relative;
+        }
+        header .user-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 18px;
+        }
+        header .user-info a {
+            text-decoration: none;
+            color: white;
+            margin-left: 10px;
+        }
+        header .user-info img {
+            width: 24px;
+            height: 24px;
+            vertical-align: middle;
+            margin-right: 5px;
         }
         main {
             max-width: 800px;
@@ -56,6 +75,16 @@
 <body>
     <header>
         <h1>欢迎来到英语学习平台</h1>
+        <div class="user-info">
+            {% if user.is_authenticated %}
+                <img src="{% static 'images/default_icon.png' %}" alt="User Icon">
+                {{ user.username }}
+                <a href="{% url 'logout' %}">注销</a>
+            {% else %}
+                <img src="{% static 'images/default_icon.png' %}" alt="Default Icon">
+                <a href="{% url 'login' %}">登录</a>
+            {% endif %}
+        </div>
     </header>
     <main>
         <h1>选择功能</h1>

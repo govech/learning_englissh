@@ -1,7 +1,10 @@
+from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 
 
 # Create your models here.
+
 
 class Word(models.Model):
     """
@@ -29,6 +32,29 @@ class Word(models.Model):
         - self.word: 单词本身。
         """
         return self.word
+
+
+class UserWordProgress(models.Model):
+    """用户学习进度模型
+
+    该模型记录用户对某个单词的学习进度，包括是否已记住、复习次数、最近一次复习时间及下次复习时间
+    """
+    # 关联用户，当用户被删除时，级联删除该用户的学习进度记录
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # 关联单词，当单词被删除时，级联删除该单词的学习进度记录
+    word = models.ForeignKey(Word, on_delete=models.CASCADE)
+    # 记录用户是否已记住该单词，默认为否
+    is_memorized = models.BooleanField(default=False)
+    # 记录用户对单词的复习次数，默认为0
+    review_count = models.IntegerField(default=0)
+    # 记录用户最近一次复习该单词的时间，默认为当前时间
+    last_review_time = models.DateTimeField(default=timezone.now)
+    # 记录用户下次复习该单词的时间，默认为当前时间
+    next_review_time = models.DateTimeField(default=timezone.now)
+
+    # 确保同一个用户对同一个单词的学习进度是唯一的
+    class Meta:
+        unique_together = ['user', 'word']
 
 
 class Article(models.Model):

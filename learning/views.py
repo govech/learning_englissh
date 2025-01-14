@@ -1,3 +1,5 @@
+from django.contrib.auth import login
+from django.contrib.auth.forms import UserCreationForm
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Word
 
@@ -7,6 +9,20 @@ from .models import Word
 
 def home(request):
     return render(request, 'learning/home.html')
+
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)  # 注册后自动登录
+            return redirect('home')  # 重定向到主页
+    else:
+        form = UserCreationForm()
+    return render(request, 'learning/register.html', {'form': form})
+
+
 
 
 def word_list(request):

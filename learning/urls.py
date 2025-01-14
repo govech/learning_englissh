@@ -1,4 +1,7 @@
 # 导入Django的URL路径函数和当前应用的视图模块
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import path
 from . import views
 
@@ -13,5 +16,8 @@ urlpatterns = [
     path('reading/', views.reading_page, name='reading_page'),  # 阅读页
     path('add_words/', views.add_words, name='add_words'),  # 添加单词页面
     path('delete_word/<int:word_id>/', views.delete_word, name='delete_word'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('register/', views.register, name='register'),
 
 ]
