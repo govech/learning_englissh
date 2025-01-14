@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语学习首页</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        header {
+            background-color: #007BFF;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        main {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .nav {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .nav a {
+            text-decoration: none;
+            color: white;
+            background-color: #007BFF;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 18px;
+            transition: background-color 0.3s ease;
+        }
+        .nav a:hover {
+            background-color: #0056b3;
+        }
+        .description {
+            text-align: center;
+            font-size: 16px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>欢迎来到英语学习平台</h1>
+    </header>
+    <main>
+        <h1>选择功能</h1>
+        <div class="nav">
+            <a href="{% url 'word_list' %}">单词列表页</a>
+            <a href="{% url 'word_card' %}">单词卡片页</a>
+            <a href="{% url 'reading_page' %}">阅读页</a>
+        </div>
+        <div class="description">
+            <p>在这里，你可以通过以下功能提升你的英语学习体验：</p>
+            <ul>
+                <li>查看完整的单词列表，管理和学习单词</li>
+                <li>使用卡片方式记忆单词，快速提升词汇量</li>
+                <li>阅读精选文章，巩固语言理解能力</li>
+            </ul>
+        </div>
+    </main>
+</body>
+</html>

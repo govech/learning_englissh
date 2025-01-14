@@ -6,5 +6,11 @@ from . import views
 urlpatterns = [
     # 创建一个URL模式，将 '/words/' 路径映射到 'views.word_list' 视图函数
     # 这个模式命名为 'word_list'，便于在模板或其他视图中引用
-    path('words/', views.word_list, name='word_list'),
+
+    path('', views.home, name='home'),  # 首页
+    path('words/', views.word_list, name='word_list'),  # 单词列表页
+    path('word_card/', views.word_card, name='word_card'),  # 单词卡片页
+    path('reading/', views.reading_page, name='reading_page'),  # 阅读页
+
+
 ]

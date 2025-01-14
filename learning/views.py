@@ -3,6 +3,12 @@ from .models import Word
 
 
 # Create your views here.
+
+
+def home(request):
+    return render(request, 'learning/home.html')
+
+
 def word_list(request):
     """
     获取所有单词并渲染到单词列表页面。
@@ -21,3 +27,12 @@ def word_list(request):
     # 渲染模板并返回HttpResponse对象
     return render(request, 'learning/word_list.html', {'words': words})
 
+
+def word_card(request):
+    # 这里实现单词卡片的功能
+    return render(request, 'learning/word_card.html')
+
+
+def reading_page(request):
+    # 这里实现阅读页的功能
+    return render(request, 'learning/reading_page.html')
