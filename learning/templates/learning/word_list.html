@@ -1,9 +1,10 @@
+<!-- templates/learning/word_list.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>背单词</title>
+    <title>单词列表</title>
     <style>
         table {
             width: 100%;
@@ -53,8 +54,10 @@
                         {% endfor %}
                     </td>
                     <td>
-                        <button>编辑</button>
-                        <button>删除</button>
+                        <form action="{% url 'delete_word' word.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" onclick="return confirm('确定要删除这个单词吗？')">删除</button>
+                        </form>
                     </td>
                 </tr>
             {% endfor %}

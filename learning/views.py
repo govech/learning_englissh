@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from .models import Word
 
 
@@ -53,3 +53,10 @@ def add_words(request):
                     Word.objects.get_or_create(word=word)
             return redirect('word_list')  # 保存成功后重定向到单词列表页
     return render(request, 'learning/add_words.html')
+
+
+def delete_word(request, word_id):
+    word = get_object_or_404(Word, id=word_id)
+    word.delete()
+    return redirect('word_list')  # 重定向到单词列表页面
+
