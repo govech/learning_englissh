@@ -17,6 +17,9 @@ class Word(models.Model):
     word = models.CharField(max_length=100)
     definition = models.CharField(max_length=100)
     example = models.TextField()
+    phonetic_uk = models.CharField(max_length=100, blank=True)  # 英音音标
+    phonetic_us = models.CharField(max_length=100, blank=True)  # 美音音标
+    rating = models.IntegerField(default=0, choices=[(i, str(i)) for i in range(0, 6)])  # 熟练度等级限制在0~5
 
     def __str__(self):
         """

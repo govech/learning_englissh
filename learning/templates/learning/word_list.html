@@ -1,17 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>背单词</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 18px;
+            text-align: left;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .rating {
+            color: gold;
+        }
+    </style>
 </head>
 <body>
     <h1>背单词</h1>
-    <ul>
-        {% for word in words %}
-            <li>
-                <strong>{{ word.word }}</strong>: {{ word.definition }}<br>
-                <em>{{ word.example }}</em>
-            </li>
-        {% endfor %}
-    </ul>
+    <table>
+        <thead>
+            <tr>
+                <th>序号</th>
+                <th>单词</th>
+                <th>音标</th>
+                <th>释义</th>
+                <th>等级</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for word in words %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ word.word }}</td>
+                    <td>英 {{ word.phonetic_uk }} / 美 {{ word.phonetic_us }}</td>
+                    <td>{{ word.definition }}</td>
+                    <td>
+                        {% for i in "12345" %}
+                            <span class="rating">{% if forloop.counter <= word.rating %}★{% else %}☆{% endif %}</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <button>编辑</button>
+                        <button>删除</button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>
