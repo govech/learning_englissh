@@ -44,6 +44,10 @@ LOGOUT_REDIRECT_URL = '/'
 
 
 
+
+# 定义音频文件存储路径
+AUDIO_FILE_STORAGE_PATH = 'media/audio'
+
 STATICFILES_DIRS = [
     BASE_DIR / 'learning/static',
 ]

@@ -1,9 +1,14 @@
 import logging
+import os
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
+from django.core.files import File
+from django.core.files.storage import default_storage
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Word
+from .models import Word, AudioFile
 import requests
 from lxml import html
 
@@ -54,38 +59,101 @@ def word_card(request):
 
     # 如果单词没有中文意思，调用翻译 API 获取并保存
     if not random_word.definition:
-        phonetic,chinese_meaning, uk_pronunciation_link, us_pronunciation_link = get_youdao_data(random_word)
+        phonetic, chinese_meaning, uk_pronunciation_link, us_pronunciation_link = get_youdao_data(random_word)
         if chinese_meaning:
             random_word.definition = chinese_meaning
             random_word.phonetic = phonetic
             random_word.save()  # 保存到数据库
 
+    if not random_word.phonetic_uk:
+        if uk_pronunciation_link:
+            download_and_save_audio(uk_pronunciation_link, random_word, "uk")
 
+    if not random_word.phonetic_us:
+        if us_pronunciation_link:
+            download_and_save_audio(us_pronunciation_link, random_word, "us")
 
-    # if uk_pronunciation_link:
-    #     download_audio(uk_pronunciation_link, f"{random_word}_uk.mp3")
-    # if us_pronunciation_link:
-    #     download_audio(us_pronunciation_link, f"{random_word}_us.mp3")
-
-    # print(f"Word: {random_word}, Phonetic: {phonetic}")
-    # print(f"translation: {trans_text}")
-    # print(f"UK Pronunciation Link: {uk_pronunciation_link}")
-    # print(f"US Pronunciation Link: {us_pronunciation_link}")
+    print(f"Word: {random_word}, Phonetic: {phonetic}")
+    print(f"UK Pronunciation Link: {uk_pronunciation_link}")
+    print(f"US Pronunciation Link: {us_pronunciation_link}")
 
     return render(request, 'learning/word_card.html', {'word': random_word})
 
 
-def download_audio(url, filename):
+def download_and_save_audio(url, word, language):
     try:
+        logging.info("--------------------------------------------------")
+        logging.info(url)
+        logging.info("--------------------------------------------------")
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            with open(filename, 'wb') as f:
-                f.write(response.content)
-            logging.info(f"音频文件已保存为 {filename}")
+            # 构建音频文件存储路径
+            if language == "us":
+                audio_file_path = Path(settings.AUDIO_FILE_STORAGE_PATH) / "us" / f'{word.word}.mp3'
+            else:
+                audio_file_path = Path(settings.AUDIO_FILE_STORAGE_PATH) / "uk" / f'{word.word}.mp3'
+            os.makedirs(audio_file_path.parent, exist_ok=True)
+
+            # 使用 Django 的 default_storage 保存文件
+            with default_storage.open(audio_file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            logging.info(f"音频文件已保存为 {audio_file_path}")
+
+            # 更新 Word 对象的音频字段
+            if language == "uk":
+                word.phonetic_uk = str(audio_file_path)
+            else:
+                word.phonetic_us = str(audio_file_path)
+            word.save()
+
+            # 创建并保存 AudioFile 对象
+            with default_storage.open(audio_file_path, 'rb') as audio_file:
+                audio_file_obj = AudioFile(
+                    word_text=word.word,
+                    file_path=audio_file_path,  # 修改这里，使用 file_path 字段
+                    language=language
+                )
+                audio_file_obj.save()
+
         else:
             logging.error(f"下载失败，状态码：{response.status_code}")
     except requests.exceptions.RequestException as e:
         logging.error(f"下载音频时发生异常: {e}")
+    except Exception as e:
+        logging.error(f"处理音频文件时发生未知异常: {e}")
+
+
+# def download_and_save_audio(url, word, language):
+#     try:
+#         response = requests.get(url, timeout=10)
+#         if response.status_code == 200:
+#             audio_file_path = f'media/audio/{word.word}.mp3'  # 设置音频文件存储路径
+#             os.makedirs(os.path.dirname(audio_file_path), exist_ok=True)
+#             with open(audio_file_path, 'wb') as f:
+#                 f.write(response.content)
+#             logging.info(f"音频文件已保存为 {audio_file_path}")
+#
+#             # 更新Word对象的音频字段
+#             if language == "uk":
+#                 word.phonetic_uk = audio_file_path
+#             else:
+#                 word.phonetic_us = audio_file_path
+#             word.save()
+#
+#             # 创建并保存AudioFile对象
+#             with open(audio_file_path, 'rb') as audio_file:
+#                 audio_file_obj = AudioFile(
+#                     word_text=word.word,
+#                     file=File(audio_file, name=os.path.basename(audio_file_path)),
+#                     language = language
+#                 )
+#                 audio_file_obj.save()
+#
+#         else:
+#             logging.error(f"下载失败，状态码：{response.status_code}")
+#     except requests.exceptions.RequestException as e:
+#         logging.error(f"下载音频时发生异常: {e}")
 
 
 def get_youdao_data(word):
@@ -124,10 +192,10 @@ def get_youdao_data(word):
             return phonetic, trans_text, uk_pronunciation_link, us_pronunciation_link
         else:
             logging.error(f"请求失败，状态码：{response.status_code}")
-            return "", "", "",""
+            return "", "", "", ""
     except requests.exceptions.RequestException as e:
         logging.error(f"网络请求异常: {e}")
-        return "", "", "",""
+        return "", "", "", ""
 
 
 def reading_page(request):

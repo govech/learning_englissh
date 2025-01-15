@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 
@@ -24,7 +26,6 @@ class Word(models.Model):
     phonetic_us = models.CharField(max_length=100, blank=True)  # 美音发音地址
     rating = models.IntegerField(default=0, choices=[(i, str(i)) for i in range(0, 6)])  # 熟练度等级限制在0~5
 
-
     def __str__(self):
         """
         返回单词本身的字符串表示。
@@ -33,6 +34,21 @@ class Word(models.Model):
         - self.word: 单词本身。
         """
         return self.word
+
+
+class AudioFile(models.Model):
+    # 读音对应的单词
+    word_text = models.CharField(max_length=100, blank=True, null=True)  # 存储对应的单词名称
+    file_path = models.CharField(max_length=100, blank=True, null=True)  # 存储对应的发音文件路径
+
+    LANGUAGE_CHOICES = [
+        ('uk', 'UK'),
+        ('us', 'US'),
+    ]
+    # 存储英音还是美音
+    language = models.CharField(max_length=2, choices=LANGUAGE_CHOICES, blank=False, null=False)
+    def __str__(self):
+        return self.word_text
 
 
 class UserWordProgress(models.Model):
