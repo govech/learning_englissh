@@ -54,9 +54,15 @@ def word_list(request):
     return render(request, 'learning/word_list.html', {'words': words})
 
 
+
 def word_card(request):
     # 这里实现单词卡片的功能
     random_word = Word.objects.order_by('?').first()
+
+    # 初始化变量
+    phonetic = ""
+    uk_pronunciation_link = ""
+    us_pronunciation_link = ""
 
     # 如果单词没有中文意思，调用翻译 API 获取并保存
     if not random_word.definition:
@@ -66,19 +72,18 @@ def word_card(request):
             random_word.phonetic = phonetic
             random_word.save()  # 保存到数据库
 
-    if not random_word.phonetic_uk:
-        if uk_pronunciation_link:
-            download_and_save_audio(uk_pronunciation_link, random_word, "uk")
+    if not random_word.phonetic_uk and uk_pronunciation_link:
+        download_and_save_audio(uk_pronunciation_link, random_word, "uk")
 
-    if not random_word.phonetic_us:
-        if us_pronunciation_link:
-            download_and_save_audio(us_pronunciation_link, random_word, "us")
+    if not random_word.phonetic_us and us_pronunciation_link:
+        download_and_save_audio(us_pronunciation_link, random_word, "us")
 
-    print(f"Word: {random_word}, Phonetic: {phonetic}")
-    print(f"UK Pronunciation Link: {uk_pronunciation_link}")
-    print(f"US Pronunciation Link: {us_pronunciation_link}")
+    logging.info(f"Word: {random_word}, Phonetic: {phonetic}")
+    logging.info(f"UK Pronunciation Link: {uk_pronunciation_link}")
+    logging.info(f"US Pronunciation Link: {us_pronunciation_link}")
 
     return render(request, 'learning/word_card.html', {'word': random_word})
+
 
 
 def download_and_save_audio(url, word, language):
