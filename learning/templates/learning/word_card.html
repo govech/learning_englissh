@@ -111,7 +111,16 @@
                     console.error('Error fetching audio:', error);
                 });
         }
+         // 刷新页面并自动播放音频
+        function refreshPage() {
+            window.location.reload();
+        }
 
+        // 页面加载完成后自动播放音频
+        window.onload = function () {
+            const word = "{{ word.word }}";  // 获取当前单词
+            playAudio(word);  // 自动播放音频
+        };
     </script>
 </body>
 </html>
