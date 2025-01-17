@@ -32,6 +32,7 @@
             font-size: 1.2em;
             color: #555;
             margin-bottom: 10px;
+            cursor: pointer; /* 添加鼠标指针样式 */
         }
         .definition {
             font-size: 1.2em;
@@ -66,9 +67,51 @@
 <body>
     <div class="card">
         <div class="word">{{ word.word }}</div>
-        <div class="pronunciation">美式音标: {{ word.phonetic }}</div>
+        <div class="pronunciation" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</div>
         <div class="definition">{{ word.definition }}</div>
         <button class="refresh-button" onclick="window.location.reload()">下一个单词</button>
     </div>
+
+    <!-- 添加音频播放器 -->
+     <audio id="audioPlayer" preload="auto"></audio>
+
+    <script>
+        function playAudio(word) {
+            const url = `/audio/${word}/`;
+            console.log('Generated URL:', url);
+
+            fetch(url)
+                .then(response => {
+                    console.log('Fetch response:', response);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Parsed data:', data);
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    if (data.audio_url) {
+                        // 手动拼接 MEDIA_URL 和相对路径
+                        const mediaUrl = 'http://127.0.0.1:8000/media/';  // 与 Django 的 MEDIA_URL 一致
+
+                        const fullAudioUrl = mediaUrl + data.audio_url;
+                        audioPlayer.src = fullAudioUrl; // 设置音频文件路径
+                        console.log('Audio source set to:', audioPlayer.src);
+                        audioPlayer.play().then(() => {
+                            console.log('Audio played successfully');
+                        }).catch(error => {
+                            console.error('Error playing audio:', error);
+                        });
+                    } else {
+                        throw new Error('未找到音频文件');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching audio:', error);
+                });
+        }
+
+    </script>
 </body>
 </html>

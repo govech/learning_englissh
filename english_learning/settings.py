@@ -43,14 +43,16 @@ LOGOUT_REDIRECT_URL = '/'
 
 
 
-
-
-# 定义音频文件存储路径
-AUDIO_FILE_STORAGE_PATH = 'media/audio'
-
 STATICFILES_DIRS = [
     BASE_DIR / 'learning/static',
 ]
+
+
+MEDIA_URL = '/media/'
+# 定义媒体文件的根目录
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

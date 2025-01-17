@@ -7,6 +7,7 @@ from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.core.files import File
 from django.core.files.storage import default_storage
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Word, AudioFile
 import requests
@@ -83,38 +84,42 @@ def word_card(request):
 def download_and_save_audio(url, word, language):
     try:
         logging.info("--------------------------------------------------")
-        logging.info(url)
+        logging.info(f"下载音频 URL: {url}")
         logging.info("--------------------------------------------------")
+
+        # 下载音频文件
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            # 构建音频文件存储路径
+            # 构建相对路径（相对于 MEDIA_ROOT）
             if language == "us":
-                audio_file_path = Path(settings.AUDIO_FILE_STORAGE_PATH) / "us" / f'{word.word}.mp3'
+                relative_path = f"audio/us/{word.word}.mp3"
             else:
-                audio_file_path = Path(settings.AUDIO_FILE_STORAGE_PATH) / "uk" / f'{word.word}.mp3'
-            os.makedirs(audio_file_path.parent, exist_ok=True)
+                relative_path = f"audio/uk/{word.word}.mp3"
+
+            # 确保目录存在
+            full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
             # 使用 Django 的 default_storage 保存文件
-            with default_storage.open(audio_file_path, 'wb') as f:
+            with default_storage.open(relative_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            logging.info(f"音频文件已保存为 {audio_file_path}")
+            logging.info(f"音频文件已保存为 {relative_path}")
 
             # 更新 Word 对象的音频字段
             if language == "uk":
-                word.phonetic_uk = str(audio_file_path)
+                word.phonetic_uk = relative_path
             else:
-                word.phonetic_us = str(audio_file_path)
+                word.phonetic_us = relative_path
             word.save()
 
             # 创建并保存 AudioFile 对象
-            with default_storage.open(audio_file_path, 'rb') as audio_file:
-                audio_file_obj = AudioFile(
-                    word_text=word.word,
-                    file_path=audio_file_path,  # 修改这里，使用 file_path 字段
-                    language=language
-                )
-                audio_file_obj.save()
+            audio_file_obj = AudioFile(
+                word_text=word.word,
+                file_path=relative_path,  # 存储相对路径
+                language=language
+            )
+            audio_file_obj.save()
 
         else:
             logging.error(f"下载失败，状态码：{response.status_code}")
@@ -124,36 +129,19 @@ def download_and_save_audio(url, word, language):
         logging.error(f"处理音频文件时发生未知异常: {e}")
 
 
-# def download_and_save_audio(url, word, language):
-#     try:
-#         response = requests.get(url, timeout=10)
-#         if response.status_code == 200:
-#             audio_file_path = f'media/audio/{word.word}.mp3'  # 设置音频文件存储路径
-#             os.makedirs(os.path.dirname(audio_file_path), exist_ok=True)
-#             with open(audio_file_path, 'wb') as f:
-#                 f.write(response.content)
-#             logging.info(f"音频文件已保存为 {audio_file_path}")
-#
-#             # 更新Word对象的音频字段
-#             if language == "uk":
-#                 word.phonetic_uk = audio_file_path
-#             else:
-#                 word.phonetic_us = audio_file_path
-#             word.save()
-#
-#             # 创建并保存AudioFile对象
-#             with open(audio_file_path, 'rb') as audio_file:
-#                 audio_file_obj = AudioFile(
-#                     word_text=word.word,
-#                     file=File(audio_file, name=os.path.basename(audio_file_path)),
-#                     language = language
-#                 )
-#                 audio_file_obj.save()
-#
-#         else:
-#             logging.error(f"下载失败，状态码：{response.status_code}")
-#     except requests.exceptions.RequestException as e:
-#         logging.error(f"下载音频时发生异常: {e}")
+# 提供单词音频地址
+def get_audio_url(request, word):
+    # audio_files = get_object_or_404(AudioFile, word_text=word)
+    audio_file = AudioFile.objects.filter(word_text=word, language='us')
+
+    # 获取数据库中的路径
+    db_path = audio_file.first().file_path
+    # 构建完整的音频文件 URL
+    # audio_url = settings.MEDIA_ROOT / db_path
+    audio_url = str(db_path)
+    # 返回 JSON 响应
+    logging.info(f"======hhhhhh======:{audio_url}")
+    return JsonResponse({'audio_url': audio_url})
 
 
 def get_youdao_data(word):
