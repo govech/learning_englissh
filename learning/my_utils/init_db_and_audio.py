@@ -3,13 +3,10 @@ import os
 import random
 import time
 
-
 from django.conf import settings
 
 from django.core.files.storage import default_storage
 from django.db import transaction
-
-
 
 import requests
 from lxml import html
@@ -21,7 +18,9 @@ from learning.models import Word, AudioFile
 # 设置日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
+"""
+此脚本用于为单词下载音标、发音、翻译
+"""
 
 
 def word_card():
@@ -84,9 +83,6 @@ def word_card():
     return f"单词: {random_word.word}"
 
 
-
-
-
 def download_and_save_audio(url, word, language):
     try:
         logging.info("--------------------------------------------------")
@@ -133,11 +129,6 @@ def download_and_save_audio(url, word, language):
         logging.error(f"下载音频时发生异常: {e}")
     except Exception as e:
         logging.error(f"处理音频文件时发生未知异常: {e}")
-
-
-
-
-
 
 
 # 提供单词音频地址
@@ -197,10 +188,3 @@ def get_youdao_data(word):
     except requests.exceptions.RequestException as e:
         logging.error(f"网络请求异常: {e}")
         return "", "", "", ""
-
-
-
-
-
-
-

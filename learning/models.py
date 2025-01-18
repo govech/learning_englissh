@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
@@ -51,27 +54,63 @@ class AudioFile(models.Model):
         return self.word_text
 
 
-class UserWordProgress(models.Model):
-    """用户学习进度模型
-
-    该模型记录用户对某个单词的学习进度，包括是否已记住、复习次数、最近一次复习时间及下次复习时间
-    """
-    # 关联用户，当用户被删除时，级联删除该用户的学习进度记录
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    # 关联单词，当单词被删除时，级联删除该单词的学习进度记录
-    word = models.ForeignKey(Word, on_delete=models.CASCADE)
-    # 记录用户是否已记住该单词，默认为否
-    is_memorized = models.BooleanField(default=False)
-    # 记录用户对单词的复习次数，默认为0
-    review_count = models.IntegerField(default=0)
-    # 记录用户最近一次复习该单词的时间，默认为当前时间
-    last_review_time = models.DateTimeField(default=timezone.now)
-    # 记录用户下次复习该单词的时间，默认为当前时间
-    next_review_time = models.DateTimeField(default=timezone.now)
-
-    # 确保同一个用户对同一个单词的学习进度是唯一的
-    class Meta:
-        unique_together = ['user', 'word']
+# class UserWordProgress(models.Model):
+#     """用户学习进度模型
+#
+#     该模型记录用户对某个单词的学习进度，包括是否已记住、复习次数、最近一次复习时间及下次复习时间
+#     """
+#     # 关联用户，当用户被删除时，级联删除该用户的学习进度记录
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     # 关联单词，当单词被删除时，级联删除该单词的学习进度记录
+#     word = models.ForeignKey(Word, on_delete=models.CASCADE)
+#     # 记录用户是否已记住该单词，默认为否
+#     is_memorized = models.BooleanField(default=False)
+#     # 记录用户对单词的复习次数，默认为0
+#     review_count = models.IntegerField(default=0)
+#     # 记录用户最近一次复习该单词的时间，默认为当前时间
+#     last_review_time = models.DateTimeField(default=timezone.now)
+#     # 记录用户下次复习该单词的时间，默认为当前时间
+#     next_review_time = models.DateTimeField(default=timezone.now)
+#     # 复习间隔，初始为1天
+#     review_interval = models.IntegerField(default=1)
+#
+#     STATUS_CHOICES = [
+#         (0, '新单词'),
+#         (1, '熟练度1'),
+#         (2, '熟练度2'),
+#         (3, '熟练度3'),
+#         (4, '熟练度4'),
+#         (5, '熟练度5'),
+#     ]
+#     # 状态：0 (新单词), 1-5(熟练度)
+#     status = models.IntegerField(choices=STATUS_CHOICES, default=0)
+#
+#     def clean(self):
+#         if self.status not in dict(self.STATUS_CHOICES):
+#             raise ValidationError(f"无效的状态值: {self.status}")
+#     def update_review(self, rating):
+#         """
+#         根据评分更新复习间隔和复习日期。
+#         :param rating: 用户评分，表示记忆情况。
+#         """
+#         if rating == 5:
+#             self.review_interval *= 2  # 间隔加倍
+#         elif rating == 4:
+#             self.review_interval = int(self.review_interval * 1.5)  # 略微延长
+#         elif rating == 3:
+#             pass  # 保持当前间隔
+#         elif rating == 2:
+#             self.review_interval = max(1, self.review_interval - 1)  # 缩短复习间隔
+#         elif rating == 1:
+#             self.review_interval = 1  # 完全忘记，重置间隔为1
+#
+#         # 更新复习日期
+#         self.next_review_date = timezone.now() + timedelta(days=self.review_interval)
+#         self.save()
+#
+#     # 确保同一个用户对同一个单词的学习进度是唯一的
+#     class Meta:
+#         unique_together = ['user', 'word']
 
 
 class Article(models.Model):
