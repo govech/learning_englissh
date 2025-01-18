@@ -40,9 +40,22 @@
             white-space: nowrap;
         }
         .phonetic {
-            cursor: pointer; /* 鼠标悬停时显示手型 */
-            color: blue; /* 音标文字颜色 */
-            text-decoration: underline; /* 添加下划线 */
+            cursor: pointer;
+            color: blue;
+            text-decoration: underline;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination a {
+            margin: 0 5px;
+            text-decoration: none;
+            color: #007BFF;
+        }
+        .pagination a.active {
+            font-weight: bold;
+            color: #000;
         }
     </style>
 </head>
@@ -60,9 +73,9 @@
             </tr>
         </thead>
         <tbody>
-            {% for word in words %}
+            {% for word in page_obj %}
                 <tr>
-                    <td>{{ forloop.counter }}</td>
+                    <td>{{ word.global_index }}</td>  <!-- 使用全局序号 -->
                     <td class="word">{{ word.word }}</td>
                     <td class="phonetic" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</td>
                     <td class="definition">{{ word.definition }}</td>
@@ -81,6 +94,23 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- 分页导航栏 -->
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; 第一页</a>
+            <a href="?page={{ page_obj.previous_page_number }}">上一页</a>
+        {% endif %}
+
+        <span class="current">
+            第 {{ page_obj.number }} 页 / 共 {{ page_obj.paginator.num_pages }} 页
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">下一页</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">最后一页 &raquo;</a>
+        {% endif %}
+    </div>
 
     <script>
         function playAudio(word) {
@@ -119,7 +149,6 @@
                     alert('无法获取音频文件，请稍后重试。');
                 });
         }
-
     </script>
 </body>
 </html>

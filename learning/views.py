@@ -10,13 +10,14 @@ from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.core.files import File
 from django.core.files.storage import default_storage
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Subquery, OuterRef
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 
-from .models import Word, AudioFile, UserWordProgress
+from .models import Word, AudioFile
 import requests
 from lxml import html
 
@@ -46,21 +47,35 @@ def register(request):
 
 def word_list(request):
     """
-    获取所有单词并渲染到单词列表页面。
+    获取单词列表并分页显示
 
-    从数据库中获取所有单词对象，然后将这些单词数据传递给模板进行渲染。
-    这个函数定义了一个视图，该视图响应于HTTP请求，返回包含所有单词的页面。
+    从数据库中获取所有的单词对象，并按 id 排序以确保分页顺序一致
+    然后将这些单词对象分页，每页显示 50 条数据
+    根据请求中的页码获取当前页的数据，并为每个单词对象计算全局序号
+    最后将当前页的数据传递给模板进行渲染，并返回 HttpResponse 对象
 
     参数:
-    - request: HttpRequest对象，表示用户的请求。
+    request (HttpRequest): 客户端请求对象，包含请求方法、请求参数等信息
 
     返回:
-    - HttpResponse对象，包含渲染后的页面，展示所有单词的列表。
+    HttpResponse: 渲染后的页面内容
     """
     # 从数据库中获取所有的单词对象
-    words = Word.objects.all()
-    # 渲染模板并返回HttpResponse对象
-    return render(request, 'learning/word_list.html', {'words': words})
+    words = Word.objects.all().order_by('id')  # 按 id 排序，确保分页顺序一致
+
+    # 分页，每页显示 50 条数据
+    paginator = Paginator(words, 15)
+    page_number = request.GET.get('page')  # 获取当前页码
+    page_obj = paginator.get_page(page_number)  # 获取当前页的数据
+
+    # 计算全局序号
+    start_index = (page_obj.number - 1) * paginator.per_page  # 当前页的起始索引
+    for index, word in enumerate(page_obj.object_list, start=start_index + 1):
+        word.global_index = index  # 为每个单词对象添加全局序号
+
+    # 渲染模板并返回 HttpResponse 对象
+    return render(request, 'learning/word_list.html', {'page_obj': page_obj})
+
 
 
 def word_card(request):
@@ -250,32 +265,31 @@ def add_words(request):
 
 
 def delete_word(request, word_id):
-    """
-    删除指定的单词对象及其关联的音频文件。
-
-    此函数使用事务确保数据一致性。在删除单词对象之前，它首先删除与该单词关联的所有音频文件。
-    如果在删除过程中遇到任何错误，将记录错误信息并回滚事务。
-
-    参数:
-    - request: HTTP 请求对象，包含请求信息。
-    - word_id: 要删除的单词的主键标识符。
-
-    返回:
-    - 成功删除后重定向到单词列表页面。
-    - 如果删除过程中发生错误，重定向到错误页面。
-    """
     try:
         with transaction.atomic():
-            # 使用 try-except 块来处理获取单词对象时可能抛出的异常
             word = get_object_or_404(Word, id=word_id)
 
             # 获取关联的 AudioFile 记录
             audio_files = AudioFile.objects.filter(word_text=word.word)
+
+            # 尝试从数据库中删除单词对象及其关联的 AudioFile 记录
+            for audio_file in audio_files:
+                try:
+                    audio_file.delete()
+                except Exception as e:
+                    logging.error(f"删除 AudioFile 数据库记录失败: {audio_file.id}, 错误信息: {e}")
+                    raise  # 重新抛出异常以触发事务回滚
+
+            try:
+                word.delete()
+            except Exception as e:
+                logging.error(f"删除单词对象失败: {word.id}, 错误信息: {e}")
+                raise  # 重新抛出异常以触发事务回滚
+
+            # 如果所有数据库操作成功，则删除文件
             for audio_file in audio_files:
                 if audio_file.file_path:
-                    # 构建文件的完整路径并进行规范化，以确保路径安全
                     file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, audio_file.file_path))
-                    # 检查文件是否存在且路径正确，然后尝试删除文件
                     if os.path.exists(file_path) and str(file_path).startswith(str(settings.MEDIA_ROOT)):
                         try:
                             os.remove(file_path)
@@ -283,25 +297,11 @@ def delete_word(request, word_id):
                         except OSError as e:
                             logging.error(f"删除音频文件失败: {file_path}, 错误信息: {e}")
 
-                try:
-                    # 尝试从数据库中删除 AudioFile 记录
-                    audio_file.delete()
-                except Exception as e:
-                    logging.error(f"删除 AudioFile 数据库记录失败: {audio_file.id}, 错误信息: {e}")
-
-            try:
-                # 尝试从数据库中删除单词对象
-                word.delete()
-            except Exception as e:
-                logging.error(f"删除单词对象失败: {word.id}, 错误信息: {e}")
-                raise  # 重新抛出异常以触发事务回滚
-
     except Exception as e:
         logging.error(f"删除单词过程中发生错误: {e}")
-        # 根据需求决定是否重定向到错误页面或返回错误响应
         return redirect('word_list')
 
-    return redirect('word_list')  # 重定向到单词列表页面
+    return redirect('word_list')
 
 # def start_learning_new_word(user, word_id):
 #     """
