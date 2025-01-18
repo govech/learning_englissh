@@ -1,0 +1,55 @@
+# 忽略虚拟环境目录
+venv/
+env/
+.venv/
+.venvs/
+ENV/
+envs/
+
+# 忽略Python编译文件
+*.pyc
+__pycache__/
+
+# 忽略IDE配置文件
+.idea/
+.vscode/
+
+# 忽略日志文件
+*.log
+
+# 忽略临时文件
+*.tmp
+*.swp
+
+# 忽略pip下载的包
+pip-log.txt
+
+# 忽略Jupyter Notebook的检查点文件
+.ipynb_checkpoints/
+
+# 忽略Docker相关文件
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 忽略其他常见文件
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+
+# 忽略文档生成的文件
+docs/_build/
+
+# 忽略media下的所有文件
+media/
