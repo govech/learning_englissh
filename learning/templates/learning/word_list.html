@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>单词列表</title>
     <style>
+        .container{
+            width: 85%;
+            margin: 0 auto;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -16,6 +20,9 @@
         th, td {
             border: 1px solid #ddd;
             padding: 8px;
+        }
+        .index {
+            width: 80px;
         }
         th {
             background-color: #f4f4f4;
@@ -32,7 +39,7 @@
             word-wrap: break-word;
         }
         td.word, td.phonetic {
-            width: auto;
+            width: 200px;
             white-space: nowrap;
         }
         td.actions {
@@ -40,6 +47,7 @@
             white-space: nowrap;
         }
         .phonetic {
+            width: 200px;
             cursor: pointer;
             color: blue;
             text-decoration: underline;
@@ -57,49 +65,54 @@
             font-weight: bold;
             color: #000;
         }
+
+
     </style>
 </head>
 <body>
-    <h1>背单词</h1>
+<h1>背单词</h1>
+<div class="container">
+
+
     <table>
         <thead>
-            <tr>
-                <th>序号</th>
-                <th>单词</th>
-                <th>音标</th>
-                <th>释义</th>
-                <th>等级</th>
-                <th>操作</th>
-            </tr>
+        <tr>
+            <th>序号</th>
+            <th>单词</th>
+            <th>音标</th>
+            <th>释义</th>
+            <th>等级</th>
+            <th>操作</th>
+        </tr>
         </thead>
         <tbody>
-            {% for word in page_obj %}
-                <tr>
-                    <td>{{ word.global_index }}</td>  <!-- 使用全局序号 -->
-                    <td class="word">{{ word.word }}</td>
-                    <td class="phonetic" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</td>
-                    <td class="definition">{{ word.definition }}</td>
-                    <td>
-                        {% for i in "12345" %}
-                            <span class="rating">{% if forloop.counter <= word.rating %}★{% else %}☆{% endif %}</span>
-                        {% endfor %}
-                    </td>
-                    <td class="actions">
-                        <form action="{% url 'delete_word' word.id %}" method="post" style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit" onclick="return confirm('确定要删除这个单词吗？')">删除</button>
-                        </form>
-                    </td>
-                </tr>
-            {% endfor %}
+        {% for word in page_obj %}
+        <tr>
+            <td class="index">{{ word.global_index }}</td>  <!-- 使用全局序号 -->
+            <td class="word">{{ word.word }}</td>
+            <td class="phonetic" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</td>
+            <td class="definition">{{ word.definition }}</td>
+            <td>
+                {% for i in "12345" %}
+                <span class="rating">{% if forloop.counter <= word.rating %}★{% else %}☆{% endif %}</span>
+                {% endfor %}
+            </td>
+            <td class="actions">
+                <form action="{% url 'delete_word' word.id %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" onclick="return confirm('确定要删除这个单词吗？')">删除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
         </tbody>
     </table>
 
     <!-- 分页导航栏 -->
     <div class="pagination">
         {% if page_obj.has_previous %}
-            <a href="?page=1">&laquo; 第一页</a>
-            <a href="?page={{ page_obj.previous_page_number }}">上一页</a>
+        <a href="?page=1">&laquo; 第一页</a>
+        <a href="?page={{ page_obj.previous_page_number }}">上一页</a>
         {% endif %}
 
         <span class="current">
@@ -107,12 +120,13 @@
         </span>
 
         {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}">下一页</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}">最后一页 &raquo;</a>
+        <a href="?page={{ page_obj.next_page_number }}">下一页</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}">最后一页 &raquo;</a>
         {% endif %}
     </div>
 
-    <script>
+</div>
+<script>
         function playAudio(word) {
             const url = `/audio/${word}/`;
             console.log('Generated URL:', url);
@@ -149,6 +163,8 @@
                     alert('无法获取音频文件，请稍后重试。');
                 });
         }
-    </script>
+
+
+</script>
 </body>
 </html>
