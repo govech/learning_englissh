@@ -8,6 +8,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
+from django.core.cache import cache
 from django.core.files import File
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
@@ -77,25 +78,56 @@ def word_list(request):
     return render(request, 'learning/word_list.html', {'page_obj': page_obj})
 
 
+# 缓存键名常量
+WORD_IDS_CACHE_KEY = 'all_word_ids'
+
+
+def get_cached_word_ids():
+    """
+    获取缓存的单词 ID 列表，若不存在则从数据库加载
+    """
+    word_ids = cache.get(WORD_IDS_CACHE_KEY)
+    if word_ids is None:
+        word_ids = list(Word.objects.values_list('id', flat=True))
+        cache.set(WORD_IDS_CACHE_KEY, word_ids, timeout=60 * 60 * 24)  # 缓存 24 小时
+        logging.info("Refreshed word IDs cache")
+    return word_ids
+
 
 def word_card(request):
     start_time = time.time()
+    context = {'word': None}
+
     try:
-        # 随机选择一个 ID
-        random_word = random.choice(Word.objects.all())
-        logging.info(f"Selected word is: {random_word}")
-        if not random_word:
-            logging.warning("No words found in Word table that are not in AudioFile table.")
-            return render(request, 'learning/word_card.html', {'word': None})
+        # 1. 从缓存获取所有单词 ID
+        word_ids = get_cached_word_ids()
+        if not word_ids:
+            logging.warning("No words found in database")
+            return render(request, 'learning/word_card.html', context)
+
+        # 2. 随机选择一个 ID 并查询完整对象
+        random_id = random.choice(word_ids)
+        random_word = Word.objects.get(id=random_id)
+        logging.info(f"Selected word: {random_word}")
+
+        context['word'] = random_word
+
+    except Word.DoesNotExist:
+        # 处理缓存 ID 与实际数据不一致的情况（例如数据被删除）
+        logging.warning(f"Word with id={random_id} not found, resetting cache")
+        cache.delete(WORD_IDS_CACHE_KEY)  # 强制下次刷新缓存
+        return render(request, 'learning/word_card.html', context)
+
     except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return render(request, 'learning/word_card.html', {'word': None})
+        logging.error(f"Unexpected error: {e}", exc_info=True)
+        return render(request, 'learning/word_card.html', context)
 
-    end_time = time.time()
-    logging.info(f"查询耗时：{end_time - start_time}秒")
-    return render(request, 'learning/word_card.html', {'word': random_word})
+    finally:
+        # 记录耗时（无论成功与否）
+        end_time = time.time()
+        logging.info(f"Query time: {end_time - start_time:.4f}s")
 
-
+    return render(request, 'learning/word_card.html', context)
 
 
 # 提供单词音频地址
@@ -113,8 +145,6 @@ def get_audio_url(request, word):
     # 返回 JSON 响应
     logging.info(f"======hhhhhh======:{audio_url}")
     return JsonResponse({'audio_url': audio_url})
-
-
 
 
 def reading_page(request):
