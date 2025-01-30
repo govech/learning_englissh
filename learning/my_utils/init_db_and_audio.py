@@ -34,10 +34,11 @@ def word_card():
 
         if not word_ids:
             logging.warning("No words found in Word table that are not in AudioFile table.")
-            return "没有找到单词"
+            return ""
 
         # 随机选择一个 ID
-        random_word_id = random.choice(word_ids)
+        # random_word_id = random.choice(word_ids)
+        random_word_id = word_ids[0]
         random_word = Word.objects.get(id=random_word_id)
         logging.info(f"Selected word is: {random_word}")
         # 初始化变量
@@ -89,17 +90,43 @@ def download_and_save_audio(url, word, language):
         logging.info(f"下载音频 URL: {url}")
         logging.info("--------------------------------------------------")
 
+        # 构建相对路径（相对于 MEDIA_ROOT）
+        if language == "us":
+            relative_path = f"audio/us/{word.word}.mp3"
+        else:
+            relative_path = f"audio/uk/{word.word}.mp3"
+
+        # 检查文件是否已经存在
+        full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+        if default_storage.exists(relative_path):
+            logging.info(f"音频文件 {relative_path} 已经存在，跳过下载")
+
+            # 检查数据库中是否存在相应的 AudioFile 记录
+            audio_file_obj = AudioFile.objects.filter(word_text=word.word, language=language).first()
+            if not audio_file_obj:
+                logging.info(f"数据库中不存在 {relative_path} 的记录，创建并保存记录")
+
+                # 创建并保存 AudioFile 对象
+                audio_file_obj = AudioFile(
+                    word_text=word.word,
+                    file_path=relative_path,  # 存储相对路径
+                    language=language
+                )
+                audio_file_obj.save()
+
+                # 更新 Word 对象的音频字段
+                if language == "uk":
+                    word.phonetic_uk = relative_path
+                else:
+                    word.phonetic_us = relative_path
+                word.save()
+
+            return
+
         # 下载音频文件
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            # 构建相对路径（相对于 MEDIA_ROOT）
-            if language == "us":
-                relative_path = f"audio/us/{word.word}.mp3"
-            else:
-                relative_path = f"audio/uk/{word.word}.mp3"
-
             # 确保目录存在
-            full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
             # 使用 Django 的 default_storage 保存文件
