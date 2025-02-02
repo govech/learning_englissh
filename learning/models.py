@@ -27,7 +27,7 @@ class Word(models.Model):
     phonetic_uk = models.CharField(max_length=100, blank=True)  # 英音发音地址
     phonetic = models.CharField(max_length=100, blank=True)
     phonetic_us = models.CharField(max_length=100, blank=True)  # 美音发音地址
-    rating = models.IntegerField(default=0, choices=[(i, str(i)) for i in range(0, 6)])  # 熟练度等级限制在0~5
+    rating = models.IntegerField(default=0, choices=[(i, str(i)) for i in range(0, 6)])  # 单词本身的难度评分
 
     def __str__(self):
         """
@@ -37,6 +37,20 @@ class Word(models.Model):
         - self.word: 单词本身。
         """
         return self.word
+
+
+# models.py
+class UserWord(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    word = models.ForeignKey('Word', on_delete=models.CASCADE)
+    memory_strength = models.FloatField(default=3.0)  # 记忆强度（1-10）
+    next_review = models.DateTimeField(auto_now_add=True)  # 下次复习时间
+    error_count = models.IntegerField(default=0)  # 累计错误次数
+    last_review = models.DateTimeField(auto_now=True)  # 最后复习时间
+    priority = models.FloatField(default=0.0)  # 短期复习优先级
+
+    class Meta:
+        unique_together = ('user', 'word')
 
 
 class AudioFile(models.Model):

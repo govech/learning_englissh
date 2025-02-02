@@ -18,7 +18,7 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 
-from .models import Word, AudioFile
+from .models import Word, AudioFile, UserWord
 import requests
 from lxml import html
 
@@ -99,23 +99,24 @@ def word_card(request):
     context = {'word': None}
 
     try:
-        # 1. 从缓存获取所有单词 ID
-        word_ids = get_cached_word_ids()
-        if not word_ids:
-            logging.warning("No words found in database")
-            return render(request, 'learning/word_card.html', context)
+        # # 1. 从缓存获取所有单词 ID
+        # word_ids = get_cached_word_ids()
+        # if not word_ids:
+        #     logging.warning("No words found in database")
+        #     return render(request, 'learning/word_card.html', context)
+        #
+        # # 2. 随机选择一个 ID 并查询完整对象
+        # random_id = random.choice(word_ids)
+        # random_word = Word.objects.get(id=random_id)
+        # logging.info(f"Selected word: {random_word}")
+        current_word = get_daily_words(request.user)[0]
 
-        # 2. 随机选择一个 ID 并查询完整对象
-        random_id = random.choice(word_ids)
-        random_word = Word.objects.get(id=random_id)
-        logging.info(f"Selected word: {random_word}")
-
-        context['word'] = random_word
+        context['word'] = current_word
 
     except Word.DoesNotExist:
         # 处理缓存 ID 与实际数据不一致的情况（例如数据被删除）
-        logging.warning(f"Word with id={random_id} not found, resetting cache")
-        cache.delete(WORD_IDS_CACHE_KEY)  # 强制下次刷新缓存
+        logging.warning(f"Word with id={current_word} not found, resetting cache")
+        # cache.delete(WORD_IDS_CACHE_KEY)  # 强制下次刷新缓存
         return render(request, 'learning/word_card.html', context)
 
     except Exception as e:
@@ -128,6 +129,46 @@ def word_card(request):
         logging.info(f"Query time: {end_time - start_time:.4f}s")
 
     return render(request, 'learning/word_card.html', context)
+
+
+def select_words_for_today(user, total_new_words=20):
+    """
+    为用户选择今天需要学习的单词，包括新单词和复习单词。
+    - user: 当前用户对象
+    - total_new_words: 每天需要学习的单词数量（默认为20个）
+    """
+    # 获取所有单词
+    all_words = Word.objects.all()
+
+    # 获取用户的学习历史
+    user_words = UserWord.objects.filter(user=user)
+
+    # 获取所有新单词，即那些在 UserWord 表中不存在的单词
+    learned_words = [uw.word for uw in user_words]
+    new_words = [word for word in all_words if word not in learned_words]
+
+    # 从新单词中随机选择 total_new_words 个单词
+    new_words_today = random.sample(new_words, min(total_new_words, len(new_words)))
+
+    # 获取需要复习的单词，按优先级从高到低排序
+    review_words_today = user_words.exclude(word__in=new_words_today)  # 避免重复选择
+    review_words_today = review_words_today.order_by('-priority')[:total_new_words]
+
+    # 合并新单词和复习单词
+    words_for_today = new_words_today + [uw.word for uw in review_words_today]
+
+    return words_for_today
+
+
+# 示例：每次用户登录时调用该方法，获取当天需要学习的单词
+def get_daily_words(user):
+    """
+    获取每天需要学习的单词（包括新单词和复习单词）
+    """
+    # 获取今天需要学习的单词
+    words_for_today = select_words_for_today(user)
+
+    return words_for_today
 
 
 # 提供单词音频地址
