@@ -63,84 +63,155 @@
             background-color: #0056b3;
         }
 
+
+        .feedback-buttons {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+        .feedback-btn {
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            color: white;
+        }
+        #knowBtn {
+            background: #4CAF50;
+        }
+        #forgetBtn {
+            background: #f44336;
+        }
+        .feedback-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+    
+    
     </style>
 </head>
 <body>
+<!--<div class="card">-->
+<!--    <div class="word">{{ word.word }}</div>-->
+<!--    <div class="pronunciation" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</div>-->
+<!--    <div class="definition">{{ word.definition }}</div>-->
+<!--    <button class="refresh-button" id="refreshButton" onclick="window.location.reload()">下一个单词</button>-->
+<!--</div>-->
 <div class="card">
     <div class="word">{{ word.word }}</div>
-    <div class="pronunciation" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</div>
+    <div class="pronunciation" onclick="playAudio('{{ word.word }}')">
+        {{ word.phonetic }}
+    </div>
     <div class="definition">{{ word.definition }}</div>
-    <button class="refresh-button" id="refreshButton" onclick="window.location.reload()">下一个单词</button>
+    
+    <div class="feedback-buttons">
+        <button class="feedback-btn" id="forgetBtn" onclick="handleFeedback('forget')">
+            😞 不认识
+        </button>
+        <button class="feedback-btn" id="knowBtn" onclick="handleFeedback('know')">
+            😃 认识
+        </button>
+    </div>
 </div>
+<!-- 添加 CSRF Token -->
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 
 <!-- 添加音频播放器 -->
 <audio id="audioPlayer" preload="auto"></audio>
 
 <script>
-    let intervalId; // 声明 intervalId 变量
+        let intervalId; // 声明 intervalId 变量
+    
+        function playAudio(word) {
+            const url = `/audio/${word}/`;
+            console.log('Generated URL:', url);
+    
+            fetch(url)
+                .then(response => {
+                    console.log('Fetch response:', response);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Parsed data:', data);
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    if (data.audio_url) {
+                        // 手动拼接 MEDIA_URL 和相对路径
+                        const mediaUrl = 'http://127.0.0.1:8000/media/';  // 与 Django 的 MEDIA_URL 一致
+    
+                        const fullAudioUrl = mediaUrl + data.audio_url;
+                        audioPlayer.src = fullAudioUrl; // 设置音频文件路径
+                        console.log('Audio source set to:', audioPlayer.src);
+                        audioPlayer.play().then(() => {
+                            console.log('Audio played successfully');
+                        }).catch(error => {
+                            console.error('Error playing audio:', error);
+                        });
+                    } else {
+                        throw new Error('未找到音频文件');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching audio:', error);
+                });
+        }
+    
+        // 刷新页面并自动播放音频
+        function refreshPage() {
+            window.location.reload();
+        }
+    
+    
+        // 页面加载完成后自动播放音频
+        window.onload = function () {
+            const word = "{{ word.word }}";  // 获取当前单词
+            playAudio(word);  // 自动播放音频
+    
+            // 清除旧的 interval（如果有）
+<!--            if (intervalId) {-->
+<!--                clearInterval(intervalId);-->
+<!--            }-->
+<!--    -->
+<!--            // 每隔 3 秒自动点击“下一个单词”按钮-->
+<!--            intervalId = setInterval(function () {-->
+<!--                const refreshButton = document.getElementById('refreshButton');-->
+<!--                if (refreshButton) {-->
+<!--                    refreshButton.click();-->
+<!--                } else {-->
+<!--                    console.error('未找到 refreshButton 元素');-->
+<!--                }-->
+<!--            }, 3000);  // 3000 毫秒 = 3 秒-->
+        };
+        
+        function handleFeedback(action) {
+            const wordId = "{{ word.id }}";
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    function playAudio(word) {
-        const url = `/audio/${word}/`;
-        console.log('Generated URL:', url);
-
-        fetch(url)
-            .then(response => {
-                console.log('Fetch response:', response);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
+            fetch('/handle_feedback/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    word_id: wordId,
+                    action: action
+                })
             })
-            .then(data => {
-                console.log('Parsed data:', data);
-                const audioPlayer = document.getElementById('audioPlayer');
-                if (data.audio_url) {
-                    // 手动拼接 MEDIA_URL 和相对路径
-                    const mediaUrl = 'http://127.0.0.1:8000/media/';  // 与 Django 的 MEDIA_URL 一致
-
-                    const fullAudioUrl = mediaUrl + data.audio_url;
-                    audioPlayer.src = fullAudioUrl; // 设置音频文件路径
-                    console.log('Audio source set to:', audioPlayer.src);
-                    audioPlayer.play().then(() => {
-                        console.log('Audio played successfully');
-                    }).catch(error => {
-                        console.error('Error playing audio:', error);
-                    });
-                } else {
-                    throw new Error('未找到音频文件');
-                }
+            .then(response => {
+                if (!response.ok) throw new Error('反馈失败');
+                window.location.reload();
             })
             .catch(error => {
-                console.error('Error fetching audio:', error);
+                console.error('Error:', error);
+                alert('提交失败，请重试');
             });
-    }
-
-    // 刷新页面并自动播放音频
-    function refreshPage() {
-        window.location.reload();
-    }
-
-
-    // 页面加载完成后自动播放音频
-    window.onload = function () {
-        const word = "{{ word.word }}";  // 获取当前单词
-        playAudio(word);  // 自动播放音频
-
-        // 清除旧的 interval（如果有）
-        if (intervalId) {
-            clearInterval(intervalId);
         }
-
-        // 每隔 3 秒自动点击“下一个单词”按钮
-        intervalId = setInterval(function () {
-            const refreshButton = document.getElementById('refreshButton');
-            if (refreshButton) {
-                refreshButton.click();
-            } else {
-                console.error('未找到 refreshButton 元素');
-            }
-        }, 3000);  // 3000 毫秒 = 3 秒
-    };
+    
 </script>
 </body>
 </html>

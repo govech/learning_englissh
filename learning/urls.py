@@ -20,5 +20,5 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('register/', views.register, name='register'),
     path('audio/<str:word>/', views.get_audio_url, name='get_audio_url'),
-
+    path('handle_feedback/', views.handle_feedback, name='handle_feedback'),
 ]

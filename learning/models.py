@@ -48,6 +48,7 @@ class UserWord(models.Model):
     error_count = models.IntegerField(default=0)  # 累计错误次数
     last_review = models.DateTimeField(auto_now=True)  # 最后复习时间
     priority = models.FloatField(default=0.0)  # 短期复习优先级
+    correct_streak = models.IntegerField(default=0) # 连续正确次数
 
     class Meta:
         unique_together = ('user', 'word')

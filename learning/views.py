@@ -1,26 +1,22 @@
+import json
 import logging
 import os
-import random
 import time
-from datetime import timedelta
-from pathlib import Path
-
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.core.cache import cache
-from django.core.files import File
-from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Subquery, OuterRef
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from datetime import datetime, timedelta
 
+import random
 from .models import Word, AudioFile, UserWord
-import requests
-from lxml import html
 
 # Create your views here.
 
@@ -169,6 +165,112 @@ def get_daily_words(user):
     words_for_today = select_words_for_today(user)
 
     return words_for_today
+
+
+# @csrf_exempt
+# @require_POST
+# def handle_feedback(request):
+#     try:
+#         data = json.loads(request.body)
+#         word_id = data['word_id']
+#         action = data['action']
+#
+#         user_word = UserWord.objects.get(
+#             user=request.user,
+#             word_id=word_id
+#         )
+#
+#         update_word_priority(user_word, action)
+#
+#         return JsonResponse({
+#             'status': 'success',
+#             'new_priority': user_word.priority,
+#             'next_review': user_word.next_review.strftime('%Y-%m-%d %H:%M')
+#         })
+#
+#     except Exception as e:
+#         return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+@csrf_exempt
+@require_POST
+def handle_feedback(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            word_id = data.get('word_id')
+            action = data.get('action')
+
+            if not word_id or not action:
+                return JsonResponse({'error': '缺少参数'}, status=400)
+
+            word = get_object_or_404(Word, id=word_id)
+            logging.info("Before the dash line")
+            user_word, created = UserWord.objects.get_or_create(
+                user=request.user,
+                word=word
+            )
+
+            update_word_priority(user_word, action)
+            return JsonResponse({
+                'status': 'success',
+                'new_priority': user_word.priority,
+                'next_review': user_word.next_review.strftime('%Y-%m-%d %H:%M')
+            })
+
+
+
+        except json.JSONDecodeError:
+            logging.error("JSON解码失败")
+            return JsonResponse({'error': '无效的JSON格式'}, status=400)
+        except Word.DoesNotExist:
+            logging.error(f"未找到ID为 {word_id} 的单词")
+            return JsonResponse({'error': '未找到单词'}, status=404)
+        except Exception as e:
+            logging.exception("处理反馈时发生未知错误")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def update_word_priority(user_word, feedback_type):
+
+    if user_word is None:
+        raise ValueError("user_word cannot be None")
+    if not hasattr(user_word, 'correct_streak'):
+        raise AttributeError("user_word missing required attributes")
+    if feedback_type not in ['know', 'forget']:  # 明确允许的反馈类型
+        raise ValueError("Invalid feedback_type")
+
+    # 更新计数
+    if feedback_type == 'know':
+        user_word.correct_streak = max(1, user_word.correct_streak + 1)
+        user_word.error_count = max(0, user_word.error_count - 1)
+    else:
+        user_word.error_count += 1
+        user_word.correct_streak = max(-1, user_word.correct_streak - 2)  # 确保 correct_streak 不低于 -1
+
+    # 计算记忆强度
+    strength = 3.0 + 1.5 ** user_word.correct_streak - 0.8 * user_word.error_count
+    strength = max(0.5, min(strength, 15.0)) * (0.95 + 0.1 * random.random())
+    user_word.memory_strength = round(strength, 2)
+
+    # 计算优先级
+    days_since = (timezone.now() - user_word.last_review).days
+    time_factor = 1.2 ** max(days_since - 3, 0)
+    priority = (10 / (1 + strength ** 0.7)) * (1 + 0.3 * user_word.error_count) * time_factor
+    user_word.priority = max(0.1, min(priority, 100.0))
+
+    # 设置复习间隔
+    if strength < 5:
+        interval = 1
+    elif strength < 10:
+        interval = 3 + 0.5 * (strength - 5)
+    else:
+        interval = 5 * (1.5 ** ((strength - 10) / 5))
+
+    user_word.next_review = timezone.now() + timedelta(days=min(round(interval), 30))
+
+    # 合并属性更新，减少数据库操作
+    user_word.save()
 
 
 # 提供单词音频地址
