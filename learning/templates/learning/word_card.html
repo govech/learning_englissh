@@ -1,129 +1,192 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>单词卡片</title>
+    <title>每日单词学习</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        /* 基础重置 */
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .card {
-            background-color: white;
-            padding: 20px;
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        /* 进度条样式 */
+        .progress-container {
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            background: #e9ecef;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            height: 12px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.4s ease;
+        }
+
+        /* 学习卡片样式 */
+        .learning-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .word-header {
             text-align: center;
-            max-width: 400px;
-            width: 100%;
+            margin-bottom: 2rem;
         }
-        .word {
-            font-size: 2em;
-            font-weight: bold;
-            margin-bottom: 10px;
+
+        .word-text {
+            font-size: 2.5rem;
+            color: #2d3436;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
         }
-        .pronunciation {
-            font-size: 1.2em;
-            color: #555;
-            margin-bottom: 10px;
-            cursor: pointer; /* 添加鼠标指针样式 */
+
+        .phonetic {
+            font-size: 1.2rem;
+            color: #636e72;
+            cursor: pointer;
+            transition: color 0.2s;
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            background: #f8f9fa;
         }
+
+        .phonetic:hover {
+            background: #e9ecef;
+        }
+
         .definition {
-            font-size: 1.2em;
-            color: #555;
-            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: #2d3436;
+            line-height: 1.6;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
-        .chinese-meaning {
-            font-size: 1.2em;
-            color: #007BFF;
-            margin-bottom: 20px;
-        }
+
         .example {
-            font-size: 1em;
-            color: #777;
+            color: #636e72;
             font-style: italic;
-        }
-        .refresh-button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-        }
-        .refresh-button:hover {
-            background-color: #0056b3;
+            border-left: 3px solid #74b9ff;
+            padding-left: 1rem;
+            margin: 1.5rem 0;
         }
 
-
+        /* 反馈按钮 */
         .feedback-buttons {
-            display: flex;
-            gap: 15px;
-            margin: 20px 0;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
         }
+
         .feedback-btn {
-            padding: 12px 25px;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s;
+            padding: 1rem;
             border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        #knowBtn {
+            background: #4caf50;
             color: white;
         }
-        #knowBtn {
-            background: #4CAF50;
-        }
+
         #forgetBtn {
-            background: #f44336;
+            background: #ff7675;
+            color: white;
         }
+
         .feedback-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 640px) {
+            body {
+                padding: 1rem;
+            }
+
+            .word-text {
+                font-size: 2rem;
+            }
+
+            .learning-card {
+                padding: 1.5rem;
+            }
         }
     
     
     </style>
 </head>
 <body>
-<!--<div class="card">-->
-<!--    <div class="word">{{ word.word }}</div>-->
-<!--    <div class="pronunciation" onclick="playAudio('{{ word.word }}')">{{ word.phonetic }}</div>-->
-<!--    <div class="definition">{{ word.definition }}</div>-->
-<!--    <button class="refresh-button" id="refreshButton" onclick="window.location.reload()">下一个单词</button>-->
-<!--</div>-->
-<div class="card">
-    <div class="word">{{ word.word }}</div>
-    <div class="pronunciation" onclick="playAudio('{{ word.word }}')">
-        {{ word.phonetic }}
-    </div>
-    <div class="definition">{{ word.definition }}</div>
-    
-    <div class="feedback-buttons">
-        <button class="feedback-btn" id="forgetBtn" onclick="handleFeedback('forget')">
-            😞 不认识
-        </button>
-        <button class="feedback-btn" id="knowBtn" onclick="handleFeedback('know')">
-            😃 认识
-        </button>
-    </div>
+<!-- 进度显示 -->
+<div class="progress-container">
+    <div class="progress-bar" style="width: {{ progress }}%"></div>
 </div>
-<!-- 添加 CSRF Token -->
-    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 
-<!-- 添加音频播放器 -->
-<audio id="audioPlayer" preload="auto"></audio>
+<!-- 学习卡片 -->
+<div class="learning-card">
+    <!-- 单词信息 -->
+    <div class="word-header">
+        <div class="word-text">{{ word.word }}</div>
+        <div class="phonetic" onclick="playAudio('{{word.word}}')">
+            {{ word.phonetic }}
+        </div>
+    </div>
+    
+    <!-- 释义和例句 -->
+    <div class="definition">{{ word.definition }}</div>
+    <div class="example">"{{ word.example|default:'暂无例句' }}"</div>
+    
+    <!-- 反馈按钮 -->
+    <div class="feedback-buttons">
+        <button class="feedback-btn" id="forgetBtn" onclick="handleFeedback(false)">
+            <span>😞</span> 不认识
+        </button>
+        <button class="feedback-btn" id="knowBtn" onclick="handleFeedback(true)">
+            <span>😃</span> 认识
+        </button>
+    </div>
+    
+    <!-- 隐藏数据 -->
+    <input type="hidden" id="taskId" value="{{ task_id }}">
+    <input type="hidden" id="wordId" value="{{ word.id }}">
+    <audio id="audioPlayer" style="display:none;"></audio>
+</div>
+
+<!-- 进度文本 -->
+<div style="text-align: center; margin-top: 1.5rem; color: #636e72;">
+    剩余 {{ remaining }} 个单词 | 已完成 {{ progress }}%
+</div>
 
 <script>
-        let intervalId; // 声明 intervalId 变量
-    
         function playAudio(word) {
             const url = `/audio/${word}/`;
             console.log('Generated URL:', url);
@@ -159,59 +222,63 @@
                     console.error('Error fetching audio:', error);
                 });
         }
-    
-        // 刷新页面并自动播放音频
-        function refreshPage() {
-            window.location.reload();
-        }
-    
-    
+
         // 页面加载完成后自动播放音频
         window.onload = function () {
             const word = "{{ word.word }}";  // 获取当前单词
             playAudio(word);  // 自动播放音频
-    
-            // 清除旧的 interval（如果有）
-<!--            if (intervalId) {-->
-<!--                clearInterval(intervalId);-->
-<!--            }-->
-<!--    -->
-<!--            // 每隔 3 秒自动点击“下一个单词”按钮-->
-<!--            intervalId = setInterval(function () {-->
-<!--                const refreshButton = document.getElementById('refreshButton');-->
-<!--                if (refreshButton) {-->
-<!--                    refreshButton.click();-->
-<!--                } else {-->
-<!--                    console.error('未找到 refreshButton 元素');-->
-<!--                }-->
-<!--            }, 3000);  // 3000 毫秒 = 3 秒-->
         };
-        
-        function handleFeedback(action) {
-            const wordId = "{{ word.id }}";
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-            fetch('/handle_feedback/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    word_id: wordId,
-                    action: action
-                })
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('反馈失败');
-                window.location.reload();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('提交失败，请重试');
-            });
+
+      
+
+        // 处理用户反馈
+        async function handleFeedback(isKnown) {
+            const taskId = document.getElementById('taskId').value;
+            const wordId = document.getElementById('wordId').value;
+            const action = isKnown ? 'know' : 'forget';
+
+            try {
+                const response = await fetch('/handle_feedback/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        task_id: parseInt(taskId),
+                        word_id: parseInt(wordId),
+                        action: action
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.completed) {
+                    window.location.href = '/complete/';
+                } else {
+                    // 平滑刷新页面
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('提交反馈失败:', error);
+                alert('操作失败，请检查网络连接');
+            }
         }
+
+        // 键盘快捷键支持
+        document.addEventListener('keydown', (event) => {
+            switch(event.code) {
+                case 'ArrowLeft':
+                    handleFeedback(false);
+                    break;
+                case 'ArrowRight':
+                    handleFeedback(true);
+                    break;
+            }
+        });
     
+
 </script>
 </body>
 </html>

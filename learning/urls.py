@@ -21,4 +21,6 @@ urlpatterns = [
     path('register/', views.register, name='register'),
     path('audio/<str:word>/', views.get_audio_url, name='get_audio_url'),
     path('handle_feedback/', views.handle_feedback, name='handle_feedback'),
+    path('get-next-word/', views.get_next_word, name='get_next_word'),
+    path('daily/', views.daily_review, name='daily_review'),
 ]

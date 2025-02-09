@@ -2,8 +2,11 @@ import json
 import logging
 import os
 import time
+from itertools import chain
+
 from django.conf import settings
 from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.core.cache import cache
 from django.core.paginator import Paginator
@@ -14,11 +17,15 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from datetime import datetime, timedelta
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 
 import random
 from .models import Word, AudioFile, UserWord
-
-# Create your views here.
+from django.shortcuts import render
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from .models import DailyTask, TaskWord, UserWord
 
 # 设置日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -90,39 +97,63 @@ def get_cached_word_ids():
     return word_ids
 
 
+@login_required
 def word_card(request):
-    start_time = time.time()
-    context = {'word': None}
+    """
+    显示单词学习卡片的核心视图
+    包含进度计算、任务状态检查和动态内容加载
+    """
+    user = request.user
+    today = timezone.localdate()
 
-    try:
-        # # 1. 从缓存获取所有单词 ID
-        # word_ids = get_cached_word_ids()
-        # if not word_ids:
-        #     logging.warning("No words found in database")
-        #     return render(request, 'learning/word_card.html', context)
-        #
-        # # 2. 随机选择一个 ID 并查询完整对象
-        # random_id = random.choice(word_ids)
-        # random_word = Word.objects.get(id=random_id)
-        # logging.info(f"Selected word: {random_word}")
-        current_word = get_daily_words(request.user)[0]
+    # 获取或创建当日任务
+    task, created = DailyTask.objects.get_or_create(
+        user=user,
+        date=today,
+        defaults={'is_completed': False}
+    )
 
-        context['word'] = current_word
+    # 如果新创建任务或任务为空，生成学习内容
+    if created or not task.taskword_set.exists():
+        generate_daily_task(request, task)  # 直接传递任务对象
+    # 检查任务完成状态
+    if task.is_completed:
+        return render(request, 'learning/review_complete.html')
 
-    except Word.DoesNotExist:
-        # 处理缓存 ID 与实际数据不一致的情况（例如数据被删除）
-        logging.warning(f"Word with id={current_word} not found, resetting cache")
-        # cache.delete(WORD_IDS_CACHE_KEY)  # 强制下次刷新缓存
-        return render(request, 'learning/word_card.html', context)
+    # 获取学习进度数据
+    total_words = task.taskword_set.count()
+    completed_words = task.taskword_set.filter(status='known').count()
+    progress = int((completed_words / total_words) * 100) if total_words > 0 else 0
 
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}", exc_info=True)
-        return render(request, 'learning/word_card.html', context)
+    # 获取下一个需要学习的单词
+    task_word = (
+        TaskWord.objects
+            .filter(task=task, status__in=['new', 'retry'])
+            .select_related('word__word')
+            .order_by('-word__priority')
+            .first()
+    )
 
-    finally:
-        # 记录耗时（无论成功与否）
-        end_time = time.time()
-        logging.info(f"Query time: {end_time - start_time:.4f}s")
+    # 如果没有待学习单词，标记任务完成
+    if not task_word:
+        task.is_completed = True
+        task.save()
+        return render(request, 'learning/review_complete.html')
+
+    # 准备上下文数据
+    context = {
+        'task_id': task.id,
+        'word': {
+            'id': task_word.word.id,
+            'word': task_word.word.word.word,
+            'phonetic': task_word.word.word.phonetic,
+            'definition': task_word.word.word.definition,
+            'example': task_word.word.word.example,
+            'audio_url': task_word.word.word.phonetic_us if task_word.word.word.phonetic_us else None,
+        },
+        'progress': progress,
+        'remaining': total_words - completed_words,
+    }
 
     return render(request, 'learning/word_card.html', context)
 
@@ -167,72 +198,143 @@ def get_daily_words(user):
     return words_for_today
 
 
-# @csrf_exempt
-# @require_POST
-# def handle_feedback(request):
-#     try:
-#         data = json.loads(request.body)
-#         word_id = data['word_id']
-#         action = data['action']
-#
-#         user_word = UserWord.objects.get(
-#             user=request.user,
-#             word_id=word_id
-#         )
-#
-#         update_word_priority(user_word, action)
-#
-#         return JsonResponse({
-#             'status': 'success',
-#             'new_priority': user_word.priority,
-#             'next_review': user_word.next_review.strftime('%Y-%m-%d %H:%M')
-#         })
-#
-#     except Exception as e:
-#         return JsonResponse({'status': 'error', 'message': str(e)})
 
 
-@csrf_exempt
-@require_POST
+
+@require_http_methods(["GET"])
+def generate_daily_task(request, task):
+    """生成当日学习任务"""
+    user = request.user
+
+    # 获取待复习单词（优先级排序）
+    due_words = UserWord.get_due_words(user, limit=30)
+
+    # 补充新单词：10个新单词
+    new_words = UserWord.objects.filter(
+        user=user,
+        review_count=0
+    ).exclude(pk__in=due_words.values_list('pk', flat=True))[10]
+
+    # 创建任务关联
+    task_words = chain(due_words, new_words)
+    for word in task_words:
+        status = 'retry' if word in due_words else 'new'
+        TaskWord.objects.create(task=task, word=word, status=status)
+    return JsonResponse({
+        'task_id': task.id,
+        'is_completed': task.is_completed,
+        'words_count': task.words.count()
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
 def handle_feedback(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            word_id = data.get('word_id')
-            action = data.get('action')
+    """处理用户反馈"""
+    try:
+        # 解析 JSON 数据
+        data = json.loads(request.body)
+        task_id = data.get('task_id')
+        word_id = data.get('word_id')
+        action = data.get('action')  # 前端发送的是 'know' 或 'forget'
 
-            if not word_id or not action:
-                return JsonResponse({'error': '缺少参数'}, status=400)
+        # 将 action 转换为 is_correct
+        is_correct = action == 'know'
 
-            word = get_object_or_404(Word, id=word_id)
-            logging.info("Before the dash line")
-            user_word, created = UserWord.objects.get_or_create(
-                user=request.user,
-                word=word
-            )
+        # 获取任务和任务单词
+        task = DailyTask.objects.get(pk=task_id)
+        task_word = TaskWord.objects.get(task=task, word_id=word_id)
 
-            update_word_priority(user_word, action)
-            return JsonResponse({
-                'status': 'success',
-                'new_priority': user_word.priority,
-                'next_review': user_word.next_review.strftime('%Y-%m-%d %H:%M')
-            })
+        # 更新单词状态
+        task_word.status = 'known' if is_correct else 'retry'
+        task_word.save()
+
+        # 处理记忆算法
+        user_word = task_word.word
+        user_word.process_feedback(is_correct)
+
+        # 检查任务完成状态
+        task.check_completion()
+
+        # 返回响应
+        return JsonResponse({
+            'success': True,
+            'task_completed': task.is_completed,
+            'new_priority': user_word.priority
+        })
+    except DailyTask.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Task not found'
+        }, status=404)
+    except TaskWord.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'TaskWord not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
 
 
+@login_required
+def daily_review(request):
+    """每日复习主视图"""
+    user = request.user
 
-        except json.JSONDecodeError:
-            logging.error("JSON解码失败")
-            return JsonResponse({'error': '无效的JSON格式'}, status=400)
-        except Word.DoesNotExist:
-            logging.error(f"未找到ID为 {word_id} 的单词")
-            return JsonResponse({'error': '未找到单词'}, status=404)
-        except Exception as e:
-            logging.exception("处理反馈时发生未知错误")
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    # 获取或创建当日任务
+    task, created = DailyTask.objects.get_or_create(
+        user=user,
+        date=timezone.localdate(),
+        defaults={'is_completed': False}
+    )
+
+    # 生成任务内容（如果是新任务）
+    if created or not task.taskword_set.exists():
+        generate_daily_task(request, task)
+
+    # 检查任务完成状态
+    if task.is_completed:
+        return render(request, 'learning/review_complete.html')
+
+    # 获取下一个需要复习的单词
+    task_word = TaskWord.objects.filter(
+        task=task,
+        status__in=['new', 'retry']
+    ).select_related('word__word').order_by('-word__memory_strength').first()
+
+    if not task_word:
+        task.is_completed = True
+        task.save()
+        return render(request, 'learning/review_complete.html')
+
+    context = {
+        'task_id': task.id,
+        'word': {
+            'id': task_word.word.id,
+            'text': task_word.word.word.text,
+            'phonetic': task_word.word.word.phonetic,
+            'definition': task_word.word.word.definition,
+            'example': task_word.word.word.example,
+        }
+    }
+    return render(request, 'learning/word_card.html', context)
+
+
+def review_complete(request):
+    """任务完成页面"""
+    return render(request, 'learning/review_complete.html')
+
+
+def get_next_word(request):
+    """获取下一个单词的HTML片段"""
+    # 复用 daily_review 的逻辑，但只返回单词卡片部分
+    return daily_review(request)
 
 
 def update_word_priority(user_word, feedback_type):
-
     if user_word is None:
         raise ValueError("user_word cannot be None")
     if not hasattr(user_word, 'correct_streak'):
@@ -347,98 +449,3 @@ def delete_word(request, word_id):
         return redirect('word_list')
 
     return redirect('word_list')
-
-# def start_learning_new_word(user, word_id):
-#     """
-#     用户开始学习新单词，初始化用户对单词的学习进度。
-#     :param user: 当前用户
-#     :param word_id: 单词ID
-#     """
-#     word = Word.objects.get(id=word_id)  # 获取指定ID的单词
-#
-#     # 创建学习进度记录
-#     progress_instance = UserWordProgress.objects.create(
-#         user=user,
-#         word=word,
-#         review_count=0,  # 初次学习时复习次数为0
-#         last_review_time=timezone.now(),
-#         next_review_time=timezone.now() + timedelta(days=REVIEW_INTERVALS[0]),  # 初次复习时间设为1天后
-#         review_interval=REVIEW_INTERVALS[0],  # 初次复习间隔为1天
-#         status=0  # 设置为新单词状态
-#     )
-#
-#     return progress_instance
-#
-#
-# def update_review_progress(progress_instance, rating):
-#     """
-#     根据用户评分（1-5）更新复习进度。
-#     :param progress_instance: 当前单词的学习进度实例
-#     :param rating: 用户评分，1-5之间
-#     """
-#     # 用户评分较低时，复习间隔缩短
-#     if rating in [1, 2]:
-#         # 如果评分较低，复习间隔缩短，最多退回1天
-#         progress_instance.review_interval = max(1, progress_instance.review_interval - 1)
-#     elif rating >= 3:
-#         # 如果评分较高，增加复习间隔
-#         current_index = REVIEW_INTERVALS.index(progress_instance.review_interval)
-#         if current_index < len(REVIEW_INTERVALS) - 1:
-#             progress_instance.review_interval = REVIEW_INTERVALS[current_index + 1]  # 增加间隔
-#
-#     # 更新复习日期
-#     progress_instance.next_review_time = timezone.now() + timedelta(days=progress_instance.review_interval)
-#     progress_instance.review_count += 1  # 增加复习次数
-#     progress_instance.last_review_time = timezone.now()  # 更新最近复习时间
-#     progress_instance.save()
-#
-#
-# def get_words_to_review(user):
-#     """
-#     获取当前用户需要复习的单词。
-#     :param user: 当前用户
-#     :return: 需要复习的单词列表
-#     """
-#     return UserWordProgress.objects.filter(user=user, next_review_time__lte=timezone.now())
-#
-#
-# def review_word(request):
-#     """
-#     用户复习单词的逻辑，显示需要复习的单词并更新进度。
-#     :param request: 请求对象
-#     :return: 渲染复习页面
-#     """
-#     user = request.user
-#     words_to_review = get_words_to_review(user)  # 获取需要复习的单词
-#
-#     if words_to_review.exists():
-#         word_to_review = words_to_review[0].word  # 获取待复习的单词
-#
-#         if request.method == 'POST':
-#             # 用户提交评分
-#             rating = int(request.POST['rating'])  # 假设评分是1-5
-#             progress_instance = UserWordProgress.objects.get(user=user, word=word_to_review)
-#             update_review_progress(progress_instance, rating)  # 更新复习进度
-#             return redirect('review_word')  # 重定向到复习页面
-#
-#         return render(request, 'review_word.html', {'word': word_to_review})
-#     else:
-#         return render(request, 'no_words_to_review.html')  # 如果没有单词需要复习，显示无单词页面
-#
-#
-# def learn_new_word(request):
-#     """
-#     引导用户学习新单词，随机选择未学习的单词。
-#     :param request: 请求对象
-#     :return: 渲染学习新单词页面
-#     """
-#     user = request.user  # 当前用户
-#     unlearned_words = Word.objects.exclude(id__in=UserWordProgress.objects.filter(user=user).values('word_id'))
-#
-#     if unlearned_words.exists():
-#         # 从未学习的单词中随机选择一个
-#         word_to_learn = random.choice(unlearned_words)  # 随机选择一个未学习的单词
-#         start_learning_new_word(user, word_to_learn.id)  # 开始学习该单词
-#         return redirect('learn_word_page', word_id=word_to_learn.id)  # 跳转到学习该单词页面
-#     else:
-#         return render(request, 'all_words_learned.html')  # 如果所有单词都已学习，提示用户
