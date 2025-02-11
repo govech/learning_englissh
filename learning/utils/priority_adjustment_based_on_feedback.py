@@ -1,8 +1,9 @@
 import random
 
+from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
-from learning.models import UserWord
+from learning.models import UserWord, Word
 
 """
 一个基于用户反馈调整优先级的算法
@@ -93,3 +94,30 @@ def calculate_initial_schedule(user):
                 days=random.randint(1, 3)
             )
             word.save()
+
+
+
+def initialize_user_words(user):
+
+    # 获取所有单词
+    words = Word.objects.all()
+
+    # 遍历每个用户和单词
+    for word in words:
+        # 检查UserWord是否已经存在
+        if not UserWord.objects.filter(user=user, word=word).exists():
+            # 初始化UserWord
+            UserWord.objects.create(
+                user=user,
+                word=word,
+                memory_strength=3.0,  # 设置记忆强度
+                next_review=timezone.now(),  # 设置下次复习时间为当前时间
+                error_count=0,  # 错误次数初始化为0
+                correct_streak=0,  # 连续正确次数初始化为0
+                review_count=0,  # 复习次数初始化为0
+                priority=0.0,  # 复习优先级初始化为0
+                history_intervals=[],  # 历史间隔初始化为空数组
+                memory_phase='initial',  # 初始记忆阶段
+                initial_strength=3.0  # 初始强度
+            )
+            print(f"Initialized UserWord for user {user} and word {word}")

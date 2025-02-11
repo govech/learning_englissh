@@ -126,14 +126,19 @@ def word_card(request):
     progress = int((completed_words / total_words) * 100) if total_words > 0 else 0
 
     # 获取下一个需要学习的单词
-    task_word = (
+    task_word_list = (
         TaskWord.objects
-            .filter(task=task, status__in=['new', 'retry'])
-            .select_related('word__word')
-            .order_by('-word__priority')
-            .first()
+        .filter(task=task, status__in=['new', 'retry'])
+        .select_related('word__word')
     )
+    # 如果没有符合条件的单词，返回None
+    if not task_word_list.exists():
+        return None
 
+    # 按优先级（priority）降序排序，并加上一点随机性
+    retry_words = list(task_word_list)
+    random.shuffle(retry_words)  # 随机打乱顺序
+    task_word = retry_words[0]
     # 如果没有待学习单词，标记任务完成
     if not task_word:
         task.is_completed = True
@@ -198,9 +203,6 @@ def get_daily_words(user):
     return words_for_today
 
 
-
-
-
 @require_http_methods(["GET"])
 def generate_daily_task(request, task):
     """生成当日学习任务"""
@@ -213,7 +215,7 @@ def generate_daily_task(request, task):
     new_words = UserWord.objects.filter(
         user=user,
         review_count=0
-    ).exclude(pk__in=due_words.values_list('pk', flat=True))[10]
+    ).exclude(pk__in=due_words.values_list('pk', flat=True))[:10]
 
     # 创建任务关联
     task_words = chain(due_words, new_words)

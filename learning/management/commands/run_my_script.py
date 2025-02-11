@@ -3,7 +3,7 @@ import time
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from learning.my_utils.init_db_and_audio import word_card
-from learning.utils.priority_adjustment_based_on_feedback import calculate_initial_schedule
+from learning.utils.priority_adjustment_based_on_feedback import calculate_initial_schedule, initialize_user_words
 
 
 class Command(BaseCommand):
@@ -19,5 +19,5 @@ class Command(BaseCommand):
         #     time.sleep(2)
         #     self.stdout.write(self.style.SUCCESS(f'Test result: {result}'))
         for user in User.objects.all():
-            calculate_initial_schedule(user)
+            initialize_user_words(user)
             self.stdout.write(f"Initialized schedule for {user.username}")

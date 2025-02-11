@@ -81,6 +81,7 @@ class UserWord(models.Model):
         verbose_name="错误次数",
         help_text="累计回答错误次数"
     )
+
     last_review = models.DateTimeField(
         auto_now=True,
         verbose_name="最后复习时间",
@@ -167,21 +168,24 @@ class UserWord(models.Model):
     @classmethod
     def get_due_words(cls, user, limit=50):
         """获取待复习单词列表，确保所有单词都能被复习到"""
-        due_words = cls.objects.filter(
+        due_query = cls.objects.filter(
             user=user,
             next_review__lte=timezone.now()
         ).order_by('-priority')
 
-        # 如果待复习单词数量超过限制，则分批次返回
-        if due_words.count() > limit:
-            # 获取优先级最高的前 limit//2 个单词
-            high_priority_words = due_words[:limit // 2]
+        count = due_query.count()
+        if count > limit:
+            # 获取高优先级的前半部分
+            high_priority_words = due_query[:limit // 2]
+            high_priority_ids = list(high_priority_words.values_list('id', flat=True))
 
-            # 获取剩余单词中随机选取 limit//2 个单词
-            remaining_words = due_words[limit // 2:].order_by('?')[:limit // 2]
+            # 重新查询剩余单词，排除已选中的高优先级单词，并随机排序
+            remaining_words = due_query.exclude(id__in=high_priority_ids).order_by('?')[:limit // 2]
 
-            # 合并两部分单词
+            # 合并两部分单词（返回查询集）
             due_words = high_priority_words | remaining_words
+        else:
+            due_words = due_query
 
         return due_words
 
@@ -254,129 +258,6 @@ class UserWord(models.Model):
         return round(interval * random.uniform(0.9, 1.1), 1)
 
 
-# class UserWord(models.Model):
-#     MEMORY_PHASE_CHOICES = [
-#         ('initial', '初次学习'),
-#         ('retention', '保持阶段'),
-#         ('mastered', '完全掌握')
-#     ]
-#
-#     user = models.ForeignKey(User, on_delete=models.CASCADE)
-#     word = models.ForeignKey('Word', on_delete=models.CASCADE)
-#     memory_strength = models.FloatField(default=3.0)
-#     next_review = models.DateTimeField(default=timezone.now)
-#     error_count = models.IntegerField(default=0)
-#     last_review = models.DateTimeField(auto_now=True)
-#     priority = models.FloatField(default=0.0)
-#     correct_streak = models.IntegerField(default=0)
-#     review_count = models.IntegerField(default=0)
-#     history_intervals = models.JSONField(default=list)
-#     lock_version = models.IntegerField(default=0)
-#     memory_phase = models.CharField(
-#         max_length=20,
-#         choices=MEMORY_PHASE_CHOICES,
-#         default='initial'
-#     )
-#     initial_strength = models.FloatField(default=3.0)
-#
-#     class Meta:
-#         unique_together = ('user', 'word')
-#         indexes = [
-#             models.Index(fields=['user', 'next_review']),
-#             models.Index(fields=['priority']),
-#         ]
-#
-#     def __str__(self):
-#         return f"{self.user.username} - {self.word}"
-#
-#     def update_memory_strength(self):
-#         """更新记忆强度（含随机波动）"""
-#         base = 3.0 + 1.5 ** self.correct_streak
-#         penalty = 0.8 * math.log1p(self.error_count)
-#         noise = random.uniform(0.95, 1.05)  # ±5%波动
-#
-#         self.memory_strength = max(0.5, min(
-#             (base - penalty) * noise,
-#             15.0
-#         ))
-#         return self.memory_strength
-#
-#     def calculate_priority(self):
-#         """计算动态优先级"""
-#         days_since = (timezone.now() - self.last_review).days
-#         time_factor = 1.2 ** max(days_since - 3, 0)
-#
-#         priority = (
-#                 (10 / (1 + self.memory_strength ** 0.7)) *
-#                 (1 + 0.3 * math.log1p(self.error_count)) *
-#                 time_factor *
-#                 (2.0 if self.memory_phase == 'initial' else 1.0)
-#         )
-#         self.priority = max(0.1, min(priority, 100.0))
-#         return self.priority
-#
-#     @classmethod
-#     def get_due_words(cls, user, limit=50):
-#         """获取待复习单词列表"""
-#         return cls.objects.filter(
-#             user=user,
-#             next_review__lte=timezone.now()
-#         ).order_by('-priority')[:limit]
-#
-#     @transaction.atomic
-#     def process_feedback(self, is_correct):
-#         """处理用户反馈的原子操作"""
-#         # 获取并锁定记录
-#         obj = UserWord.objects.select_for_update().get(pk=self.pk)
-#
-#         # 更新基础数据
-#         if is_correct:
-#             obj.correct_streak += 1
-#             obj.review_count += 1
-#             obj.error_count = max(0, obj.error_count - 1)
-#         else:
-#             obj.correct_streak = max(-1, obj.correct_streak - 2)
-#             obj.error_count += 1
-#
-#         # 更新记忆阶段
-#         if obj.review_count >= 4 and obj.error_count == 0:
-#             obj.memory_phase = 'mastered'
-#         elif obj.review_count > 1:
-#             obj.memory_phase = 'retention'
-#
-#         # 计算记忆参数
-#         obj.update_memory_strength()
-#         obj.calculate_priority()
-#         interval = obj._calculate_interval()
-#
-#         # 记录历史间隔
-#         obj.history_intervals.append({
-#             'date': timezone.now().isoformat(),
-#             'interval': interval,
-#             'correct': is_correct
-#         })
-#
-#         # 设置下次复习时间
-#         obj.next_review = timezone.now() + timezone.timedelta(days=interval)
-#         obj.save()
-#         return obj
-#
-#     def _calculate_interval(self):
-#         """艾宾浩斯间隔计算核心算法"""
-#         base_intervals = [1, 7, 16, 30]
-#         idx = min(self.review_count - 1, len(base_intervals) - 1)
-#
-#         # 错误惩罚规则
-#         if self.error_count >= 2:
-#             interval = max(1, base_intervals[idx] // 2)
-#         # 连续正确奖励
-#         elif self.correct_streak >= 3:
-#             interval = min(base_intervals[-1] * 2, 60)
-#         else:
-#             interval = base_intervals[idx]
-#
-#         # 添加±10%随机波动
-#         return round(interval * random.uniform(0.9, 1.1), 1)
 
 
 class DailyTask(models.Model):
